@@ -25,6 +25,17 @@ int main(int argc, char** argv) {
         fprintf(stdout, " %zu\t %s\n", count, filename);
     }
 
+    else if (!strcmp(flag, "-l")) {
+        // Count number of lines in the file
+        size_t count = 0;
+        char ch;
+        while ((ch = getc(file)) != EOF) {
+            if (ch == '\n') count++;
+        }
+
+        fprintf(stdout, " %zu\t %s\n", count, filename);
+    }
+
     fclose(file);
     return 0;
 }
