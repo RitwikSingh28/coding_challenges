@@ -6,9 +6,14 @@
 #include <wchar.h>
 #include <wctype.h>
 
+size_t countChars(FILE*);
+size_t countLines(FILE*);
+size_t countWords(FILE*);
+size_t countMultiByteWords(FILE*);
+
 int main(int argc, char** argv) {
-    if (argc < 3) {
-        fprintf(stderr, "USAGE: ccwc -<flag> <filename>\n");
+    if (argc < 2) {
+        fprintf(stderr, "USAGE: ccwc <filename> ...flags\n");
         return 1;
     }
 
@@ -17,8 +22,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const char* flag = argv[1];
-    const char* filename = argv[2];
+    char* filename = NULL;
+    char* flag = NULL;
+    if (argc == 2) {
+        filename = argv[1];
+    } else {
+        filename = argv[2];
+        flag = argv[1];
+    }
 
     // open the file
     FILE* file = fopen(filename, "r");
@@ -28,51 +39,67 @@ int main(int argc, char** argv) {
     }
     
     if (!strcmp(flag, "-c")) {
-        // Count number of bytes in the provided file
-        size_t count = 0;
-        while (getc(file) != EOF) count++;
-
+        const size_t count = countChars(file);
         fprintf(stdout, " %zu\t %s\n", count, filename);
     }
 
     else if (!strcmp(flag, "-l")) {
-        // Count number of lines in the file
-        size_t count = 0;
-        char ch;
-        while ((ch = getc(file)) != EOF) {
-            if (ch == '\n') count++;
-        }
-
+        const size_t count = countLines(file);
         fprintf(stdout, " %zu\t %s\n", count, filename);
     }
 
     else if (!strcmp(flag, "-w")) {
-        // Count number of words in the file
-        size_t count = 0;
-        char flag = 0;
-        char ch;
-        while((ch = getc(file)) != EOF) {
-            if (!isspace(ch)) {
-                if (!flag) {
-                    flag = 1;
-                    count++;
-                }
-            } else flag = 0;
-        }
-
+        const size_t count = countWords(file);
         fprintf(stdout, "%zu\t %s\n", count, filename);
     }
 
     else if (!strcmp(flag, "-m")) {
-        size_t count = 0;
-        wint_t ch;
-        while ((ch = getwc(file)) != WEOF) {
-            count++;
-        }
-
+        const size_t count = countMultiByteWords(file);
         fprintf(stdout, "%zu\t %s\n", count, filename);
     }
 
     fclose(file);
     return 0;
+}
+
+size_t countChars(FILE* file) {
+    // Count number of bytes in the provided file
+    size_t count = 0;
+    while (getc(file) != EOF) count++;
+    return count;
+}
+
+size_t countLines(FILE* file) {
+    // Count number of lines in the file
+    size_t count = 0;
+    char ch;
+    while ((ch = getc(file)) != EOF) {
+        if (ch == '\n') count++;
+    }
+    return count;
+}
+
+size_t countWords(FILE* file) {
+    // Count number of words in the file
+    size_t count = 0;
+    char flag = 0;
+    char ch;
+    while((ch = getc(file)) != EOF) {
+        if (!isspace(ch)) {
+            if (!flag) {
+                flag = 1;
+                count++;
+            }
+        } else flag = 0;
+    }
+    return count;
+}
+
+size_t countMultiByteWords(FILE* file) {
+    size_t count = 0;
+    wint_t ch;
+    while ((ch = getwc(file)) != WEOF) {
+        count++;
+    }
+    return count;
 }
