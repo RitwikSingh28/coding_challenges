@@ -23,56 +23,85 @@ int main(int argc, char** argv) {
     }
 
     char* filename = NULL;
-    char* flag = NULL;
+    char* arg = NULL;
+    char output[2000] = {0}; // Initialize to empty string
+    char flag = 0;
+
     if (argc == 2) {
         filename = argv[1];
+        flag = 1;
     } else {
         filename = argv[2];
-        flag = argv[1];
+        arg = argv[1];
     }
 
     // open the file
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
-        fprintf(stderr, "Could not open file: %s", filename);
+        fprintf(stderr, "Could not open file: %s\n", filename);
         return 1;
     }
     
-    if (!strcmp(flag, "-c")) {
-        const size_t count = countChars(file);
-        fprintf(stdout, " %zu\t %s\n", count, filename);
+    size_t count = 0;
+
+    // Logic for -c or default (no flag)
+    if (flag || (arg && !strcmp(arg, "-c"))) {
+        char str_count[21];
+        count = countChars(file);
+        snprintf(str_count, sizeof(str_count), "%zu", count);
+        int len = strlen(output);
+        snprintf(output + len, sizeof(output) - len, " %s", str_count);
+        rewind(file);
     }
 
-    else if (!strcmp(flag, "-l")) {
-        const size_t count = countLines(file);
-        fprintf(stdout, " %zu\t %s\n", count, filename);
+    // Logic for -l or default (no flag)
+    if (flag || (arg && !strcmp(arg, "-l"))) {
+        char str_count[21];
+        count = countLines(file);
+        snprintf(str_count, sizeof(str_count), "%zu", count);
+        int len = strlen(output);
+        snprintf(output + len, sizeof(output) - len, " %s", str_count);
+        rewind(file);
     }
 
-    else if (!strcmp(flag, "-w")) {
-        const size_t count = countWords(file);
-        fprintf(stdout, "%zu\t %s\n", count, filename);
+    // Logic for -w or default (no flag)
+    if (flag || (arg && !strcmp(arg, "-w"))) {
+        char str_count[21];
+        count = countWords(file);
+        snprintf(str_count, sizeof(str_count), "%zu", count);
+        int len = strlen(output);
+        snprintf(output + len, sizeof(output) - len, " %s", str_count);
+        rewind(file);
     }
 
-    else if (!strcmp(flag, "-m")) {
-        const size_t count = countMultiByteWords(file);
-        fprintf(stdout, "%zu\t %s\n", count, filename);
+    // Logic for -m
+    if (arg && !strcmp(arg, "-m")) {
+        char str_count[21];
+        count = countMultiByteWords(file);
+        snprintf(str_count, sizeof(str_count), "%zu", count);
+        int len = strlen(output);
+        snprintf(output + len, sizeof(output) - len, " %s", str_count);
+        rewind(file);
     }
+
+    // Final filename append
+    int len = strlen(output);
+    snprintf(output + len, sizeof(output) - len, " %s", filename);
+    fprintf(stdout, "%s\n", output);
 
     fclose(file);
     return 0;
 }
 
 size_t countChars(FILE* file) {
-    // Count number of bytes in the provided file
     size_t count = 0;
     while (getc(file) != EOF) count++;
     return count;
 }
 
 size_t countLines(FILE* file) {
-    // Count number of lines in the file
     size_t count = 0;
-    char ch;
+    int ch; // int is better for EOF comparison
     while ((ch = getc(file)) != EOF) {
         if (ch == '\n') count++;
     }
@@ -80,10 +109,9 @@ size_t countLines(FILE* file) {
 }
 
 size_t countWords(FILE* file) {
-    // Count number of words in the file
     size_t count = 0;
-    char flag = 0;
-    char ch;
+    int flag = 0;
+    int ch;
     while((ch = getc(file)) != EOF) {
         if (!isspace(ch)) {
             if (!flag) {
