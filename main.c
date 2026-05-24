@@ -1,133 +1,85 @@
-#include <ctype.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
+#include "counter.h"
 #include <locale.h>
-#include <wchar.h>
-#include <wctype.h>
+#include <stdio.h>
+#include <unistd.h>
 
-size_t countChars(FILE*);
-size_t countLines(FILE*);
-size_t countWords(FILE*);
-size_t countMultiByteWords(FILE*);
-
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        fprintf(stderr, "USAGE: ccwc <filename> ...flags\n");
-        return 1;
-    }
-
-    if (setlocale(LC_CTYPE, "") == NULL) {
-        fprintf(stderr, "Failed to set the default locale\n");
-        return 1;
-    }
-
-    char* filename = NULL;
-    char* arg = NULL;
-    char output[2000] = {0}; // Initialize to empty string
-    char flag = 0;
-
-    if (argc == 2) {
-        filename = argv[1];
-        flag = 1;
-    } else {
-        filename = argv[2];
-        arg = argv[1];
-    }
-
-    // open the file
-    FILE* file = fopen(filename, "r");
-    if (file == NULL) {
-        fprintf(stderr, "Could not open file: %s\n", filename);
-        return 1;
-    }
-    
-    size_t count = 0;
-
-    // Logic for -c or default (no flag)
-    if (flag || (arg && !strcmp(arg, "-c"))) {
-        char str_count[21];
-        count = countChars(file);
-        snprintf(str_count, sizeof(str_count), "%zu", count);
-        int len = strlen(output);
-        snprintf(output + len, sizeof(output) - len, " %s", str_count);
-        rewind(file);
-    }
-
-    // Logic for -l or default (no flag)
-    if (flag || (arg && !strcmp(arg, "-l"))) {
-        char str_count[21];
-        count = countLines(file);
-        snprintf(str_count, sizeof(str_count), "%zu", count);
-        int len = strlen(output);
-        snprintf(output + len, sizeof(output) - len, " %s", str_count);
-        rewind(file);
-    }
-
-    // Logic for -w or default (no flag)
-    if (flag || (arg && !strcmp(arg, "-w"))) {
-        char str_count[21];
-        count = countWords(file);
-        snprintf(str_count, sizeof(str_count), "%zu", count);
-        int len = strlen(output);
-        snprintf(output + len, sizeof(output) - len, " %s", str_count);
-        rewind(file);
-    }
-
-    // Logic for -m
-    if (arg && !strcmp(arg, "-m")) {
-        char str_count[21];
-        count = countMultiByteWords(file);
-        snprintf(str_count, sizeof(str_count), "%zu", count);
-        int len = strlen(output);
-        snprintf(output + len, sizeof(output) - len, " %s", str_count);
-        rewind(file);
-    }
-
-    // Final filename append
-    int len = strlen(output);
-    snprintf(output + len, sizeof(output) - len, " %s", filename);
-    fprintf(stdout, "%s\n", output);
-
-    fclose(file);
-    return 0;
+void print_counts(const WcCounts *counts, int l, int w, int b, int m,
+                  const char *name) {
+  if (l)
+    printf(" %7zu", counts->lines);
+  if (w)
+    printf(" %7zu", counts->words);
+  if (b)
+    printf(" %7zu", counts->bytes);
+  if (m)
+    printf(" %7zu", counts->chars);
+  if (name)
+    printf(" %s", name);
+  printf("\n");
 }
 
-size_t countChars(FILE* file) {
-    size_t count = 0;
-    while (getc(file) != EOF) count++;
-    return count;
-}
+int main(int argc, char **argv) {
+  setlocale(LC_CTYPE, "");
 
-size_t countLines(FILE* file) {
-    size_t count = 0;
-    int ch; // int is better for EOF comparison
-    while ((ch = getc(file)) != EOF) {
-        if (ch == '\n') count++;
-    }
-    return count;
-}
+  int opt;
+  int show_lines = 0, show_words = 0, show_bytes = 0, show_chars = 0;
 
-size_t countWords(FILE* file) {
-    size_t count = 0;
-    int flag = 0;
-    int ch;
-    while((ch = getc(file)) != EOF) {
-        if (!isspace(ch)) {
-            if (!flag) {
-                flag = 1;
-                count++;
-            }
-        } else flag = 0;
+  while ((opt = getopt(argc, argv, "clwm")) != -1) {
+    switch (opt) {
+    case 'c':
+      show_bytes = 1;
+      break;
+    case 'l':
+      show_lines = 1;
+      break;
+    case 'w':
+      show_words = 1;
+      break;
+    case 'm':
+      show_chars = 1;
+      break;
+    default:
+      fprintf(stderr, "Usage: %s [-clwm] [file ...]\n", argv[0]);
+      return 1;
     }
-    return count;
-}
+  }
 
-size_t countMultiByteWords(FILE* file) {
-    size_t count = 0;
-    wint_t ch;
-    while ((ch = getwc(file)) != WEOF) {
-        count++;
+  if (!show_lines && !show_words && !show_bytes && !show_chars) {
+    show_lines = show_words = show_bytes = 1;
+  }
+
+  WcCounts total = {0, 0, 0, 0};
+  int file_count = argc - optind;
+
+  if (file_count == 0) {
+    WcCounts counts;
+    count_file(stdin, &counts);
+    print_counts(&counts, show_lines, show_words, show_bytes, show_chars, NULL);
+  } else {
+    for (int i = optind; i < argc; i++) {
+      FILE *file = fopen(argv[i], "r");
+      if (!file) {
+        perror(argv[i]);
+        continue;
+      }
+      WcCounts counts;
+      count_file(file, &counts);
+      fclose(file);
+
+      print_counts(&counts, show_lines, show_words, show_bytes, show_chars,
+                   argv[i]);
+
+      total.lines += counts.lines;
+      total.words += counts.words;
+      total.bytes += counts.bytes;
+      total.chars += counts.chars;
     }
-    return count;
+
+    if (file_count > 1) {
+      print_counts(&total, show_lines, show_words, show_bytes, show_chars,
+                   "total");
+    }
+  }
+
+  return 0;
 }
