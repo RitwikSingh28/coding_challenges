@@ -1,0 +1,3 @@
+[submodule "json_parser/tests"]
+	path = json_parser/tests
+	url = git@github.com:nst/JSONTestSuite.git
