@@ -16,9 +16,9 @@ void count_file(FILE *stream, WcCounts *counts) {
   while ((ch = fgetc(stream)) != EOF) {
     counts->bytes++;
 
-    // Basic character counting: in UTF-8, continuation bytes start with
-    // 10xxxxxx (0x80 to 0xBF) We only increment chars if it's NOT a
-    // continuation byte.
+    // Basic character counting: in UTF-8, continuation bytes start with 10xxxxxx (0x80 to 0xBF).
+    // We only increment chars if it's NOT a continuation byte.
+    // Reference: https://en.wikipedia.org/wiki/UTF-8#Description
     if ((ch & 0xC0) != 0x80) {
       counts->chars++;
     }
